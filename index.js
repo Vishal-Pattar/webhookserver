@@ -10,7 +10,7 @@ app.use(express.json());
 
 app.post("/webhook", async (req, res) => {
   const formData = req.body;
-
+  console.log("Request", req);
   let messageText = "New Jotform Submission:\n";
   for (const [key, value] of Object.entries(formData)) {
     messageText += `*${key}*: ${value}\n`;
@@ -21,6 +21,7 @@ app.post("/webhook", async (req, res) => {
   };
 
   console.log(slackMessage);
+
 
   try {
     await axios.post(process.env.WEBHOOK_URL, slackMessage);
