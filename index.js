@@ -25,6 +25,8 @@ app.post('/webhook', async (req, res) => {
         ]
     };
 
+    console.log(slackMessage);
+
     try {
         await axios.post(process.env.WEBHOOK_URL, slackMessage);
         res.status(200).send('Data sent to Slack successfully!');
