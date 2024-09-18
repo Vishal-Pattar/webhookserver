@@ -1,30 +1,36 @@
-const express = require('express');
-const axios = require('axios');
-const bodyParser = require('body-parser');
+const express = require("express");
+const axios = require("axios");
+require("dotenv").config();
 
 const app = express();
-app.use(bodyParser.json());
 const PORT = process.env.PORT || 5000;
-
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 
-app.post('/webhook', (req, res) => {
-    const data = req.body.form_response.answers;
+app.use(express.json());
 
-    let message = '';
-    data.forEach(answer => {
-        const question = answer.text;
-        const answerText = answer.answer;
-        message += `**${question}:** ${answerText}\n`;
+app.all("*", async (req, res) => {
+  try {
+    const requestDetails = {
+      method: req.method,
+      headers: req.headers,
+      body: req.body,
+      url: req.originalUrl,
+    };
+
+    await axios.post(DISCORD_WEBHOOK_URL, {
+      content: `New request received:\n\`\`\`json\n${JSON.stringify(
+        requestDetails,
+        null,
+        2
+      )}\n\`\`\``,
     });
 
-    // Send message to Discord
-    axios.post(DISCORD_WEBHOOK_URL, { content: message })
-        .then(() => res.status(200).send('OK'))
-        .catch(error => res.status(500).send('Error sending to Discord'));
-
+    res.status(200).send("Request received and sent to Discord.");
+  } catch (error) {
+    res.status(500).send("An error occurred.");
+  }
 });
 
 app.listen(PORT, () => {
-    console.log('Server is running on port', PORT);
+  console.log(`Server running on port ${PORT}`);
 });
