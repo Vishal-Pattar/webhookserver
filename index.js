@@ -1,61 +1,56 @@
-const express = require('express');
-const axios = require('axios');
-const multer = require('multer');
-require('dotenv').config();
+// File: app.js
+require("dotenv").config();
+const express = require("express");
+const multer = require("multer");
+const axios = require("axios");
+const bodyParser = require("body-parser");
 
 const app = express();
-const PORT = process.env.PORT || 5000;
-const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
-
-// Configure multer to handle multipart/form-data (file uploads and form fields)
 const upload = multer();
 
-// Middleware to parse JSON bodies (if needed)
-app.use(express.json());
+// Load Discord webhook URL from environment variable
+const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
 
-// Route to handle all incoming requests with multipart/form-data
-app.all('*', upload.any(), async (req, res) => {
-    try {
-        // Create an object to hold form data and any uploaded files
-        const formData = {};
-        
-        // Populate formData with regular form fields
-        req.body && Object.keys(req.body).forEach(key => {
-            formData[key] = req.body[key];
-        });
-        
-        // If there are any uploaded files, add them to formData
-        if (req.files && req.files.length > 0) {
-            formData.files = req.files.map(file => ({
-                originalname: file.originalname,
-                mimetype: file.mimetype,
-                size: file.size,
-            }));
-        }
+// Middleware to handle JSON body
+app.use(bodyParser.json());
 
-        const requestDetails = {
-            method: req.method,
-            headers: req.headers,
-            body: formData,  // This contains both form fields and file metadata
-            query: req.query,
-            params: req.params,
-            url: req.originalUrl,
-            ip: req.ip,
-            protocol: req.protocol,
-            hostname: req.hostname,
-        };
+// Route to handle POST requests
+app.post("/webhook", upload.none(), async (req, res) => {
+  try {
+    // Determine the content type
+    const contentType = req.headers["content-type"];
 
-        // Send the request details to Discord
-        await axios.post(DISCORD_WEBHOOK_URL, {
-            content: `New request received:\n\`\`\`json\n${JSON.stringify(requestDetails, null, 2)}\n\`\`\``,
-        });
+    // Check if the content-type is multipart/form-data
+    if (contentType.includes("multipart/form-data")) {
+      const formData = req.body;
 
-        res.status(200).send('Form data and files received and sent to Discord.');
-    } catch (error) {
-        res.status(500).send('An error occurred.');
+      // Send form data to Discord
+      await axios.post(discordWebhookUrl, {
+        content: `Received form-data: ${JSON.stringify(formData)}`,
+      });
+
+      return res.status(200).json({ message: "Form data sent to Discord." });
+    } else if (contentType.includes("application/json")) {
+      // If JSON data is sent
+      const jsonData = req.body;
+
+      // Send JSON data to Discord
+      await axios.post(discordWebhookUrl, {
+        content: `Received JSON data: ${JSON.stringify(jsonData)}`,
+      });
+
+      return res.status(200).json({ message: "JSON data sent to Discord." });
+    } else {
+      return res.status(400).json({ message: "Unsupported content type." });
     }
+  } catch (error) {
+    console.error("Error sending data to Discord:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
 });
 
+// Start the server
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
