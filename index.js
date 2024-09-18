@@ -13,6 +13,20 @@ const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
 
 app.use(bodyParser.json());
 
+// Function to preprocess rawRequest field
+function processRawRequest(rawRequestString) {
+  const cleanedString = rawRequestString
+    .replace(/\\"/g, '"') // Replace escaped double quotes
+    .replace(/\\\//g, "/"); // Replace escaped slashes
+
+  try {
+    return JSON.parse(cleanedString);
+  } catch (error) {
+    console.error("Error parsing rawRequest JSON:", error.message);
+    return null;
+  }
+}
+
 app.post("/webhook", upload.none(), async (req, res) => {
   try {
     const contentType = req.headers["content-type"];
@@ -24,6 +38,7 @@ app.post("/webhook", upload.none(), async (req, res) => {
 
     let fileData = "";
     let fileName = "";
+    let combinedData = {};
 
     if (contentType.includes("multipart/form-data")) {
       const formData = req.body;
@@ -32,7 +47,15 @@ app.post("/webhook", upload.none(), async (req, res) => {
         return res.status(400).json({ message: "Form data is missing." });
       }
 
-      fileData = JSON.stringify(formData, null, 2);
+      // Preprocess rawRequest field
+      if (formData.rawRequest) {
+        const preProcessedRequest = processRawRequest(formData.rawRequest);
+        combinedData = { ...formData, preProcessedRequest }; // Merge original and preprocessed data
+      } else {
+        combinedData = { ...formData };
+      }
+
+      fileData = JSON.stringify(combinedData, null, 2);
       fileName = "form-data.txt";
     } else if (contentType.includes("application/json")) {
       const jsonData = req.body;
@@ -41,7 +64,15 @@ app.post("/webhook", upload.none(), async (req, res) => {
         return res.status(400).json({ message: "JSON data is missing." });
       }
 
-      fileData = JSON.stringify(jsonData, null, 2);
+      // Preprocess rawRequest field
+      if (jsonData.rawRequest) {
+        const preProcessedRequest = processRawRequest(jsonData.rawRequest);
+        combinedData = { ...jsonData, preProcessedRequest }; // Merge original and preprocessed data
+      } else {
+        combinedData = { ...jsonData };
+      }
+
+      fileData = JSON.stringify(combinedData, null, 2);
       fileName = "json-data.txt";
     } else {
       return res.status(400).json({ message: "Unsupported content type." });
@@ -50,7 +81,7 @@ app.post("/webhook", upload.none(), async (req, res) => {
     // Define the file path for the temporary file
     const filePath = path.join(__dirname, fileName);
 
-    // Write the data to a file (ensure fileData is not undefined)
+    // Write the combined data to a file
     fs.writeFileSync(filePath, fileData, { encoding: "utf8" });
 
     // Send the file to the Discord webhook
