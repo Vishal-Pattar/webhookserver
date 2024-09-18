@@ -15,7 +15,7 @@ app.post("/webhook", upload.none(), async (req, res) => {
     const contentType = req.headers["content-type"];
 
     if (contentType.includes("multipart/form-data")) {
-      const formData = req.body;
+      const formData = req.body.rawRequest;
       const prettyFormData = JSON.stringify(formData, null, 2);
 
       await axios.post(discordWebhookUrl, {
