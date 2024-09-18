@@ -3,6 +3,9 @@ const express = require("express");
 const multer = require("multer");
 const axios = require("axios");
 const bodyParser = require("body-parser");
+const fs = require("fs");
+const path = require("path");
+const FormData = require("form-data");
 
 const app = express();
 const upload = multer();
@@ -14,33 +17,60 @@ app.post("/webhook", upload.none(), async (req, res) => {
   try {
     const contentType = req.headers["content-type"];
 
+    // Check if content-type is undefined or empty
+    if (!contentType) {
+      return res.status(400).json({ message: "Content type is missing." });
+    }
+
+    let fileData = "";
+    let fileName = "";
+
     if (contentType.includes("multipart/form-data")) {
-      const formData = req.body.rawRequest;
-      const prettyFormData = JSON.stringify(formData, null, 2);
+      const formData = req.body;
 
-      await axios.post(discordWebhookUrl, {
-        content: `**Received form-data:**\n\`\`\`json\n${prettyFormData}\n\`\`\``,
-      });
+      if (!formData) {
+        return res.status(400).json({ message: "Form data is missing." });
+      }
 
-      return res
-        .status(200)
-        .json({ message: "Form data sent to Discord in pretty format." });
+      fileData = JSON.stringify(formData, null, 2);
+      fileName = "form-data.txt";
     } else if (contentType.includes("application/json")) {
       const jsonData = req.body;
-      const prettyJsonData = JSON.stringify(jsonData, null, 2);
 
-      await axios.post(discordWebhookUrl, {
-        content: `**Received JSON data:**\n\`\`\`json\n${prettyJsonData}\n\`\`\``,
-      });
+      if (!jsonData) {
+        return res.status(400).json({ message: "JSON data is missing." });
+      }
 
-      return res
-        .status(200)
-        .json({ message: "JSON data sent to Discord in pretty format." });
+      fileData = JSON.stringify(jsonData, null, 2);
+      fileName = "json-data.txt";
     } else {
       return res.status(400).json({ message: "Unsupported content type." });
     }
+
+    // Define the file path for the temporary file
+    const filePath = path.join(__dirname, fileName);
+
+    // Write the data to a file (ensure fileData is not undefined)
+    fs.writeFileSync(filePath, fileData, { encoding: "utf8" });
+
+    // Send the file to the Discord webhook
+    const form = new FormData();
+    form.append("file", fs.createReadStream(filePath));
+
+    await axios.post(discordWebhookUrl, form, {
+      headers: {
+        ...form.getHeaders(),
+      },
+    });
+
+    // Delete the file after processing
+    fs.unlinkSync(filePath);
+
+    return res
+      .status(200)
+      .json({ message: "Data sent to Discord as a file and deleted." });
   } catch (error) {
-    console.error("Error sending data to Discord:", error);
+    console.error("Error sending data to Discord:", error.message);
     return res.status(500).json({ message: "Internal server error." });
   }
 });
