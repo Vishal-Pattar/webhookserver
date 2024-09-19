@@ -13,14 +13,9 @@ const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL;
 
 app.use(bodyParser.json());
 
-// Function to preprocess rawRequest field
 function processRawRequest(rawRequestString) {
-  const cleanedString = rawRequestString
-    .replace(/\\"/g, '"') // Replace escaped double quotes
-    .replace(/\\\//g, "/"); // Replace escaped slashes
-
   try {
-    return JSON.parse(cleanedString);
+    return JSON.parse(rawRequestString);
   } catch (error) {
     console.error("Error parsing rawRequest JSON:", error.message);
     return null;
